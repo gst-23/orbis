@@ -7,3 +7,89 @@
 .header-right{gap:9px}
 .connection-pill{white-space:nowrap}
 button:focus-visible,[role=button]:focus-visible{outline:2px solid #8ebeff;outline-offset:3px}
+
+/* ORBIS — PROPOSTA A: mobile, sfondo nero e giallo Filo. */
+:root{--bg:#080809;--panel:#0b0b0d;--panel2:#151518;--line:#242426;--text:#f6f6f6;--muted:#88888e;--muted2:#b9b9bf;--accent:#dfff20;--accent2:#dfff20;--green:#b4b4b7;--orange:#737379;--danger:#ff8a8e;--radius:14px}
+html,body{background:#080809;color:#f5f5f5}
+.app{max-width:520px;min-height:100dvh;padding:0 20px max(48px,env(safe-area-inset-bottom));}
+.period-section{padding:calc(26px + env(safe-area-inset-top)) 0 24px}
+.period-picker{position:relative;z-index:10}
+.period-trigger{display:flex;align-items:center;gap:10px;padding:0;background:transparent;border:0;color:#f7f7f8;text-align:left;max-width:100%;min-height:46px}
+.period-trigger h1{font-size:clamp(25px,7vw,33px);line-height:1.2;font-weight:690;letter-spacing:-1.25px;margin:0;white-space:normal}
+.period-trigger svg{width:17px;height:17px;color:#a6a6aa;flex-shrink:0;transition:transform .16s}
+.period-trigger[aria-expanded=true] svg{transform:rotate(180deg);color:var(--accent)}
+.period-popover{position:absolute;top:calc(100% + 10px);left:0;width:min(235px,calc(100vw - 42px));padding:7px;background:#1a1a1d;border:1px solid #353538;border-radius:16px;box-shadow:0 20px 40px #000c;z-index:25;display:flex;flex-direction:column;gap:1px}
+.period-popover button{min-height:41px;padding:10px 15px;border:0;border-radius:10px;background:transparent;text-align:left;color:#e1e1e4;font-size:14px;font-weight:540}
+.period-popover button.active{background:#2d2e28;color:var(--accent);font-weight:660}
+.period-popover button:active{background:#353538}
+.period-popover-divider{margin:5px 7px;height:1px;background:#343437}
+.calendar-panel{background:transparent;border:0;border-radius:0;padding:0 0 23px;box-shadow:none;touch-action:pan-y}
+.weekday-head{margin:0 0 9px;grid-template-columns:repeat(7,minmax(0,1fr))}
+.weekday-head span{padding:5px 0 12px;text-transform:uppercase;letter-spacing:.45px;font-size:11px;font-weight:560;color:#919196}
+.month-grid{gap:2px;grid-template-columns:repeat(7,minmax(0,1fr))}
+.day-cell{height:58px;min-height:58px;padding:5px 1px;gap:2px;border:1px solid transparent;border-radius:13px;color:#ededf0;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.day-cell.outside{color:#55555b}
+.day-number{width:35px;height:34px;line-height:34px;font-size:15px;font-weight:500;letter-spacing:-.25px}
+.day-cell.selected{background:rgba(255,255,255,.09);border-color:transparent}
+.day-cell.selected .day-number{color:#fff;font-weight:660}
+.day-cell.today .day-number{color:var(--accent);font-weight:680}
+.day-cell.today:not(.selected) .day-number{border:1px solid var(--accent);border-radius:50%;background:transparent}
+.day-cell.today.selected{border-color:var(--accent);background:transparent}
+.day-cell.drop-hover,.week-date.drop-hover,.hour-slot.drop-hover{background:#252918!important;border-color:var(--accent)!important;box-shadow:none}
+.event-dots{gap:4px;margin-top:1px}
+.event-dot,.event-dot.two,.event-dot.three{height:5px;width:5px;background:var(--accent)}
+.event-dot.more{background:#8b8b8c}
+.week-grid{gap:4px;padding:4px 0 10px}
+.week-date{height:84px;gap:7px;border:1px solid #242426;background:#111113;border-radius:13px;color:#b3b3b6;touch-action:pan-y}
+.week-date.selected{background:#282a1f;border-color:#879824;color:#fff}
+.week-date.today:not(.selected){border-color:var(--accent)}
+.week-date .event-dot{height:4px;width:4px}
+.agenda-section{border-top:1px solid #252527;padding:23px 0 0}
+.agenda-header{display:flex;align-items:center;gap:12px;justify-content:space-between;margin:0 0 17px}
+.agenda-header h2{font-size:18px;font-weight:620;letter-spacing:-.4px;line-height:1.3;margin:0;color:#ececee}
+.agenda-add{width:34px;height:34px;border:1px solid #303034;background:#202022;color:var(--accent);border-radius:50%;display:grid;place-items:center;flex-shrink:0}
+.agenda-add svg{height:17px;width:17px}
+.agenda-add:active{background:#30332b}
+.agenda-list{display:flex;flex-direction:column;gap:0}
+.agenda-card{display:flex;align-items:center;gap:15px;min-height:70px;padding:11px 0 12px;background:transparent;border:0;border-bottom:1px solid #272729;border-radius:0;touch-action:pan-y;transition:background .12s;user-select:none;-webkit-user-select:none}
+.agenda-card:active{background:#121214}
+.agenda-card.dragging{opacity:.3}
+.agenda-card .start-time{font-size:13px;font-weight:570;color:#d6d6d9;letter-spacing:-.3px;min-width:43px;font-variant-numeric:tabular-nums}
+.agenda-main{flex:1;min-width:0;text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:5px 0;border:0;background:none;color:inherit}
+.agenda-name{font-size:15px;font-weight:560;letter-spacing:-.15px;color:#ededf0;line-height:1.28}
+.agenda-extra{font-size:11px;color:#82828a;line-height:1.2;margin:0}
+.agenda-mark{height:22px;width:3px;flex-shrink:0;background:var(--accent);border-radius:4px;opacity:.9}
+.agenda-card.color-two .agenda-mark{background:#aaaaae}
+.agenda-card.color-three .agenda-mark{background:#74747a}
+.empty-state{border:0;border-radius:0;padding:16px 0 25px;color:#77777b;font-size:14px;text-align:left}
+.mode-banner{margin:25px 0 8px;border:1px solid #2c2c2e;background:#141416;color:#99999b;border-radius:12px;padding:12px 13px;font-size:11px;line-height:1.55}
+.mode-banner.error{background:#2a171b;color:#ffcbcb;border-color:#763840}
+.bottom-sheet{background:#141416;border-color:#36363a;border-radius:22px 22px 0 0;color:#f7f7f7}
+.bottom-sheet::backdrop{background:rgba(0,0,0,.78)}
+.sheet-header,.sheet-footer{background:#141416;border-color:#303034}
+.sheet-handle{background:#535358}
+.sheet-close{background:#29292d;color:#ececef}
+.field input,.field textarea,.recurrence-container select,.interval-row input,.duration-inputs label{background:#202023;color:#f6f6f6;border-color:#36363a}
+.recurrence-container,.scope-wrap{background:#1c1c20;border-color:#343438}
+.recurrence-container select{background:#252529}
+.recurrence-symbol{color:var(--accent)}
+.scope-switch{background:#141416}
+.scope-switch button.active{background:#35392a;color:var(--accent)}
+.color-choice.one{background:var(--accent)}
+.color-choice.two{background:#b4b4b7}
+.color-choice.three{background:#737379}
+.color-choice.selected{box-shadow:0 0 0 2px #f1f1f1;border-color:#252529}
+.primary-button{background:var(--accent);color:#101105}
+.toast{bottom:calc(28px + env(safe-area-inset-bottom));background:#252823;border-color:#4d5a24;color:#f3ffd5}
+.drag-ghost{background:#282b1b;border-color:var(--accent);color:#f5f5f5}
+.timeline-event{--event-color:var(--accent);background:#2a301c;border-color:#637a1e}
+.timeline-event.color-two{--event-color:#b4b4b7;background:#303034;border-color:#606066}
+.timeline-event.color-three{--event-color:#737379;background:#29292e;border-color:#424249}
+.timeline-event.clashed{box-shadow:inset 0 0 0 1px #eddb77}
+.day-timeline-scroll{max-height:min(72dvh,780px)}
+.hour-slot{border-color:#2a2a2d;color:#818185}
+.hour-slot:after{border-color:#171719}
+.day-timeline{padding-left:47px}
+@media (max-width:360px){.app{padding-left:15px;padding-right:15px}.period-trigger h1{font-size:27px}.calendar-panel{padding:0 0 21px}.day-cell{height:50px;min-height:50px;padding:3px 0}.day-number{font-size:14px;width:31px;height:30px;line-height:30px}.agenda-header h2{font-size:17px}}
+@media (min-width:521px){.app{border:0}.period-section{padding-top:40px}}
+@media(prefers-reduced-motion:reduce){.period-trigger svg,.agenda-card{transition:none}}

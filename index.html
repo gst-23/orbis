@@ -4,61 +4,53 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#0b0d11">
+  <meta name="theme-color" content="#080809">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="Orbis Lite: calendario condiviso mobile, semplice e senza login.">
-  <title>Orbis — il nostro calendario</title>
+  <meta name="description" content="Orbis: calendario condiviso mobile, essenziale e senza login.">
+  <title>Orbis · Calendario</title>
   <meta name="apple-mobile-web-app-title" content="Orbis">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="./icon.svg">
-  <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon-v2.png">
   <link rel="stylesheet" href="./styles.css">
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script type="module" src="./app.js"></script>
 </head>
 <body>
 <div class="app" id="appRoot">
-  <header class="app-header">
-    <div class="brand-area">
-      <div class="brand-icon"><img src="./icon.svg" alt="" width="30" height="30"></div>
-      <div class="brand-text">Orbis<span>.</span></div>
-    </div>
-    <div class="header-right">
-      <span id="connectionStatus" class="connection-pill">Inizializzazione</span>
-      <button type="button" class="icon-button" id="refreshBtn" aria-label="Aggiorna il calendario" title="Aggiorna">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M20 11a8 8 0 1 0-2.2 5.6M20 4v7h-7"/></svg>
-      </button>
-    </div>
-  </header>
-
   <main>
-    <div id="modeBanner" class="mode-banner hidden" role="status"></div>
-    <section class="period-section">
-      <div class="overline">IL NOSTRO TEMPO</div>
-      <div class="period-bar">
-        <div class="period-left"><h1 id="periodTitle">Ottobre 2026</h1><div class="date-subtitle" id="periodSubtitle">Un giorno alla volta.</div></div>
-        <div class="date-controls"><button class="nav-icon-button" id="prevPeriod" aria-label="Periodo precedente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></button><button class="nav-icon-button" id="nextPeriod" aria-label="Periodo successivo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></button></div>
-      </div>
-      <div class="view-switch" role="group" aria-label="Modalità calendario">
-        <button class="active" type="button" data-view="month">Mese</button><button type="button" data-view="week">Settimana</button><button type="button" data-view="day">Giorno</button>
+    <section class="period-section" aria-label="Periodo del calendario">
+      <div class="period-picker" id="periodPicker">
+        <button type="button" id="periodMenuToggle" class="period-trigger" aria-label="Scegli la vista del calendario" aria-haspopup="true" aria-expanded="false" aria-controls="periodMenu">
+          <h1 id="periodTitle">Novembre 2026</h1>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="period-popover hidden" id="periodMenu" role="group" aria-label="Vista e navigazione">
+          <button type="button" data-view="month" class="active">Mese</button>
+          <button type="button" data-view="week">Settimana</button>
+          <button type="button" data-view="day">Giorno</button>
+          <div class="period-popover-divider"></div>
+          <button type="button" id="goTodayBtn">Torna a oggi</button>
+          <button type="button" id="refreshMenuBtn">Aggiorna calendario</button>
+        </div>
       </div>
     </section>
 
-    <section id="calendarPanel" class="calendar-panel" aria-label="Calendario"></section>
+    <section id="calendarPanel" class="calendar-panel" aria-label="Calendario, scorri a destra o a sinistra per cambiare periodo"></section>
 
     <section class="agenda-section" id="agendaSection">
-      <div class="agenda-header"><div><div class="overline" id="agendaEyebrow">APPUNTAMENTI</div><h2 id="agendaTitle">Oggi</h2></div><span id="agendaCount" class="agenda-count">0 impegni</span></div>
+      <div class="agenda-header">
+        <h2 id="agendaTitle">Appuntamenti</h2>
+        <button type="button" id="agendaNewBtn" class="agenda-add" aria-label="Aggiungi un appuntamento al giorno selezionato" title="Nuovo appuntamento">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
       <div id="agendaList" class="agenda-list"></div>
-      <div class="gesture-note"><span class="gesture-icon">↗</span> Tieni premuto un appuntamento e trascinalo su un altro giorno.</div>
     </section>
+    <div id="modeBanner" class="mode-banner hidden" role="status"></div>
   </main>
-
-  <footer class="bottom-bar">
-    <button type="button" id="todayBtn" class="bottom-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/><path d="m9.5 15 1.6 1.6 3.4-3.5"/></svg><span>Oggi</span></button>
-    <button type="button" class="create-button" id="newEventBtn" aria-label="Nuovo appuntamento"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
-    <button type="button" id="weekBtn" class="bottom-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/><path d="M8 14h2M13 14h3M8 18h2"/></svg><span>Settimana</span></button>
-  </footer>
 </div>
 
 <dialog id="eventDialog" class="bottom-sheet" aria-labelledby="editorHeading">
@@ -72,7 +64,7 @@
       <div class="field"><span>Durata</span><div class="duration-inputs"><label><input id="durationHours" type="number" min="0" max="23" inputmode="numeric" value="1"><span>ore</span></label><label><input id="durationMinutes" type="number" min="0" max="59" inputmode="numeric" value="0"><span>minuti</span></label></div></div>
       <div class="recurrence-container" id="recurrenceContainer"><div class="recurrence-heading"><span class="recurrence-symbol">↻</span><span>Ripetizione</span></div><select id="recurrenceType" aria-label="Ripetizione"><option value="none">Non si ripete</option><option value="days">Ogni tot giorni</option><option value="weeks">Ogni tot settimane</option><option value="months">Ogni tot mesi</option><option value="years">Ogni tot anni</option></select><div id="recurrenceDetails" class="recurrence-details hidden"><div class="interval-row"><span>Ogni</span><input type="number" id="recurrenceCount" min="1" max="999" inputmode="numeric" value="1"><span id="recurrenceUnitName">settimane</span></div><label class="field"><span>Termina il <small>(facoltativo)</small></span><input type="date" id="recurrenceUntil"></label></div></div>
       <label class="field"><span>Note <small>(facoltative)</small></span><textarea rows="2" id="eventNotes" maxlength="1500" placeholder="Informazioni utili…"></textarea></label>
-      <div class="field"><span>Colore</span><div class="color-picker" role="group" aria-label="Colore appuntamento"><button class="color-choice one selected" type="button" data-color="one" aria-label="Lilla" aria-pressed="true"></button><button class="color-choice two" type="button" data-color="two" aria-label="Verde" aria-pressed="false"></button><button class="color-choice three" type="button" data-color="three" aria-label="Arancione" aria-pressed="false"></button></div></div>
+      <div class="field"><span>Colore</span><div class="color-picker" role="group" aria-label="Colore appuntamento"><button class="color-choice one selected" type="button" data-color="one" aria-label="Giallo" aria-pressed="true"></button><button class="color-choice two" type="button" data-color="two" aria-label="Grigio chiaro" aria-pressed="false"></button><button class="color-choice three" type="button" data-color="three" aria-label="Grigio scuro" aria-pressed="false"></button></div></div>
       <div id="conflictNotice" class="conflict-notice hidden" role="status"></div>
       <div id="formError" class="form-error hidden" role="alert"></div>
     </div>

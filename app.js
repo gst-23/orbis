@@ -3,7 +3,6 @@ import {dateString, localNowString, shiftDay, startOfWeek, dayFromISO, fromDayNu
 
 /* Orbis Lite — static PWA + Supabase Data API. Shared publicly, without accounts. */
 const $ = id => document.getElementById(id);
-const VIEW_KEY='orbis-lite-view-v1';
 const DEMO_STORE='orbis-lite-local-v1';
 const MONTHS=new Intl.DateTimeFormat('it-IT',{month:'long',year:'numeric',timeZone:'UTC'});
 const FULL_DATE=new Intl.DateTimeFormat('it-IT',{weekday:'long',day:'numeric',month:'long',timeZone:'UTC'});
@@ -13,7 +12,7 @@ const colors=['one','two','three'];
 const state={
   selected:dateString(), view:'month', events:[], mode:'demo', client:null, version:0,
   occurrenceMap:new Map(), edit:null, toastTimer:null, syncBusy:false,
-  drag:null, hover:null, swipe:null, timelineScroll:null,
+  drag:null, hover:null, swipe:null, timelineScroll:null, dayHold:null, preventDayClick:null,
 };
 function readStore(key){try{return localStorage.getItem(key);}catch{return null;}}
 function writeStore(key,value){try{localStorage.setItem(key,value);}catch{}}
@@ -128,25 +127,28 @@ function periodShift(dir){
 }
 function switchView(view){
   if(!['month','week','day'].includes(view))return;
-  state.view=view;writeStore(VIEW_KEY,view);render();
+  state.view=view;render();
 }
 function headerRender(){
   const sel=state.selected;
   if(state.view==='month'){
     $('periodTitle').textContent=capital(humanDate(sel,{month:'long',year:'numeric'}));
-    $('periodSubtitle').textContent='Una giornata alla volta.';
   }else if(state.view==='week'){
     const from=startOfWeek(sel),to=shiftDay(from,6);
-    $('periodTitle').textContent=capital(humanDate(sel,{month:'long',year:'numeric'}));
-    $('periodSubtitle').textContent=`Settimana ${humanDate(from,{day:'numeric',month:'short'})} – ${humanDate(to,{day:'numeric',month:'short'})}`;
+    $('periodTitle').textContent=`${humanDate(from,{day:'numeric',month:'short'})} – ${humanDate(to,{day:'numeric',month:'short'})}`;
   }else{
-    $('periodTitle').textContent=capital(humanDate(sel,{month:'long',year:'numeric'}));
-    $('periodSubtitle').textContent=capital(humanDate(sel,{weekday:'long',day:'numeric'}));
+    $('periodTitle').textContent=capital(humanDate(sel,{weekday:'long',day:'numeric',month:'long'}));
   }
-  document.querySelectorAll('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===state.view);b.setAttribute('aria-pressed',String(b.dataset.view===state.view));});
-  const isCloud=state.mode==='cloud';
-  $('connectionStatus').textContent=isCloud?'Sincronizzato':state.mode==='demo'?'Demo locale':'Non collegato';
-  $('connectionStatus').classList.toggle('cloud',isCloud);
+  document.querySelectorAll('[data-view]').forEach(b=>{
+    const active=b.dataset.view===state.view;
+    b.classList.toggle('active',active);
+    b.setAttribute('aria-pressed',String(active));
+  });
+}
+function setPeriodMenu(open){
+  const menu=$('periodMenu');
+  menu.classList.toggle('hidden',!open);
+  $('periodMenuToggle').setAttribute('aria-expanded',String(open));
 }
 function getMonthSpan(){
   const first=state.selected.slice(0,7)+'-01';
@@ -170,7 +172,7 @@ function monthRender(){
     const list=occ.filter(x=>x.start_at.slice(0,10)<=day && x.end_at.slice(0,10)>=day && minuteNumber(x.end_at)>minuteNumber(`${day}T00:00`));
     cells+=`<button type="button" class="day-cell ${day.slice(0,7)===state.selected.slice(0,7)?'':'outside'} ${day===state.selected?'selected':''} ${day===dateString()?'today':''}" data-day="${day}" aria-label="${capital(humanDate(day))}: ${list.length} appuntamenti"><span class="day-number">${Number(day.slice(-2))}</span>${dotMarkup(list)}</button>`;
   }
-  $('calendarPanel').innerHTML=`<div class="weekday-head">${WEEKDAYS.map(d=>`<span>${d}</span>`).join('')}</div><div class="month-grid">${cells}</div><div class="month-footer"><span>Tocca un giorno per vedere gli impegni</span><span>${occ.length} occorrenze</span></div>`;
+  $('calendarPanel').innerHTML=`<div class="weekday-head">${WEEKDAYS.map(d=>`<span>${d}</span>`).join('')}</div><div class="month-grid">${cells}</div>`;
 }
 function weekRender(){
   const from=startOfWeek(state.selected),to=shiftDay(from,7);
@@ -180,7 +182,7 @@ function weekRender(){
     const date=shiftDay(from,i),items=occ.filter(o=>o.start_at.slice(0,10)<=date&&o.end_at.slice(0,10)>=date&&minuteNumber(o.end_at)>minuteNumber(`${date}T00:00`));
     cols+=`<button class="week-date ${date===state.selected?'selected':''} ${date===dateString()?'today':''}" data-day="${date}" aria-label="${WEEKDAYS[i]} ${Number(date.slice(-2))}, ${items.length} appuntamenti"><span class="day-label">${WEEKDAYS[i]}</span><span class="day-number">${Number(date.slice(-2))}</span>${dotMarkup(items)}</button>`;
   }
-  $('calendarPanel').innerHTML=`<div class="week-grid">${cols}</div><div class="week-summary"><span>Trascina un impegno sul giorno desiderato</span><strong>${occ.length} appuntamenti</strong></div>`;
+  $('calendarPanel').innerHTML=`<div class="week-grid">${cols}</div>`;
 }
 function dayRender(){
   const day=state.selected,occ=eventsOnDay(state.events,day),weekIndex=new Date(`${day}T12:00:00Z`).getUTCDay();
@@ -197,7 +199,7 @@ function dayRender(){
     const creator=colors.includes(o.creator)?o.creator:'one';
     return `<div class="timeline-event color-${creator} ${clashes?'clashed':''}" data-draggable="${esc(o.uid)}" style="top:${top.toFixed(2)}px;height:${height.toFixed(2)}px"><div class="timeline-title" data-edit="${esc(o.uid)}">${esc(o.title)} ${o.recurrence_unit?'↻':''}</div><div class="timeline-time" data-edit="${esc(o.uid)}">${prettyTime(o.start_at)} – ${prettyTime(o.end_at)}</div><span class="resize-handle" data-resize="${esc(o.uid)}" role="button" tabindex="0" aria-label="Modifica la durata trascinando">⌄</span></div>`;
   }).join('');
-  $('calendarPanel').innerHTML=`<div class="day-preview"><span class="big-date">${Number(day.slice(-2))}</span><div><div class="day-name">${daysOfWeek[weekIndex]}</div><div class="day-description">${occ.length?`${occ.length} appuntamenti nel calendario`:'Nessun appuntamento per questa giornata'}</div></div></div><div class="timeline-note"><span>Scorri per vedere le 24 ore</span><strong>Trascina per spostare · ⌄ durata</strong></div><div class="day-timeline-scroll" id="timelineScroller"><div class="day-timeline">${slots}${entries}</div></div></div>`;
+  $('calendarPanel').innerHTML=`<div class="day-timeline-scroll" id="timelineScroller"><div class="day-timeline">${slots}${entries}</div></div>`;
   const timeline=$('timelineScroller');
   const pref=day===dateString()?clamp(Number(localNowString().slice(11,13))-2,6,18):7;
   timeline.scrollTop=state.timelineScroll??pref*48;
@@ -209,14 +211,14 @@ function renderAgenda(){
   if(state.view==='day'){$('agendaSection').classList.add('hidden');return;}
   $('agendaSection').classList.remove('hidden');
   $('agendaTitle').textContent=sel===dateString()?'Oggi':capital(humanDate(sel,{weekday:'long',day:'numeric',month:'long'}));
-  $('agendaCount').textContent=`${occ.length} ${occ.length===1?'impegno':'impegni'}`;
   state.occurrenceMap=new Map(occ.map(o=>[o.uid,o]));
   if(!occ.length){
-    $('agendaList').innerHTML=`<div class="empty-state"><div class="empty-icon">✳</div><strong>Una giornata libera</strong><p>Non ci sono impegni programmati.</p><button data-add-day="${sel}">+ Aggiungi un appuntamento</button></div>`;return;
+    $('agendaList').innerHTML='<div class="empty-state">Nessun appuntamento</div>';
+    return;
   }
   $('agendaList').innerHTML=occ.map(o=>{
     const creator=colors.includes(o.creator)?o.creator:'one';
-    return `<article class="agenda-card color-${creator}" data-draggable="${esc(o.uid)}"><div class="time-column"><span class="start-time">${prettyTime(o.start_at)}</span><span class="end-time">${prettyTime(o.end_at)}</span><span class="color-bar"></span></div><div class="agenda-details"><button class="agenda-main" data-edit="${esc(o.uid)}"><div class="agenda-name">${esc(o.title)}</div><div class="agenda-extra">${o.recurrence_unit?'<span class="repeat">↻</span>Ricorrente · ':''}${durationLabel(o.duration_min)}${o.revised?' · Modificato':''}</div></button><div class="agenda-actions"><button type="button" data-duration="-15" data-uid="${esc(o.uid)}" aria-label="Riduci la durata di 15 minuti">−15 min</button><button type="button" data-duration="15" data-uid="${esc(o.uid)}" aria-label="Aumenta la durata di 15 minuti">+15 min</button><button type="button" class="drag-indicator" data-drag-handle="${esc(o.uid)}" aria-label="Tieni premuto per spostare">⠿</button></div></div></article>`;
+    return `<article class="agenda-card color-${creator}" data-draggable="${esc(o.uid)}"><span class="start-time">${prettyTime(o.start_at)}</span><button type="button" class="agenda-main" data-edit="${esc(o.uid)}"><span class="agenda-name">${esc(o.title)}</span><span class="agenda-extra">${durationLabel(o.duration_min)}${o.recurrence_unit?' · ↻ Ricorrente':''}${o.revised?' · Modificato':''}</span></button><span class="agenda-mark" aria-hidden="true"></span></article>`;
   }).join('');
 }
 function render(){
@@ -390,7 +392,7 @@ function clickInsideCalendar(e){
   const add=e.target.closest('[data-add-day]');
   if(add){openNew(add.dataset.addDay);return;}
   const day=e.target.closest('[data-day]');
-  if(day){state.selected=day.dataset.day;state.timelineScroll=null;render();return;}
+  if(day){if(state.preventDayClick===day.dataset.day){state.preventDayClick=null;return;}state.selected=day.dataset.day;state.timelineScroll=null;render();return;}
   if(state.view==='day'){
     const slot=e.target.closest('[data-hour]');
     if(slot)openNew(state.selected,`${pad(Number(slot.dataset.hour))}:00`);
@@ -462,8 +464,28 @@ function stopDrag(){
   state.hover?.element?.classList.remove('drop-hover');
   state.hover=null;state.drag=null;
 }
+function cancelDayHold(){
+  if(!state.dayHold)return;
+  clearTimeout(state.dayHold.timer);
+  state.dayHold=null;
+}
 function onPointerDown(e){
   if(e.button!==undefined&&e.button!==0)return;
+  const day=e.target.closest('[data-day]');
+  if(day && !e.target.closest('[data-draggable]')){
+    cancelDayHold();
+    const hold={id:e.pointerId,day:day.dataset.day,x:e.clientX,y:e.clientY,timer:null};
+    hold.timer=setTimeout(()=>{
+      if(state.dayHold!==hold)return;
+      state.preventDayClick=hold.day;
+      state.swipe=null;
+      cancelDayHold();
+      state.selected=hold.day;
+      openNew(hold.day);
+      window.setTimeout(()=>{if(state.preventDayClick===hold.day)state.preventDayClick=null;},700);
+    },600);
+    state.dayHold=hold;
+  }
   const resize=e.target.closest('[data-resize]');
   if(resize){
     const occ=state.occurrenceMap.get(resize.dataset.resize);
@@ -483,6 +505,8 @@ function onPointerDown(e){
   else drag.timer=setTimeout(()=>{if(state.drag===drag)beginDrag();},300);
 }
 function onPointerMove(e){
+  const hold=state.dayHold;
+  if(hold?.id===e.pointerId && Math.hypot(e.clientX-hold.x,e.clientY-hold.y)>10)cancelDayHold();
   const d=state.drag;
   if(!d||d.pointer!==e.pointerId)return;
   d.lastX=e.clientX;d.lastY=e.clientY;
@@ -506,6 +530,7 @@ function onPointerMove(e){
   e.preventDefault();
 }
 async function onPointerUp(e){
+  if(state.dayHold?.id===e.pointerId)cancelDayHold();
   const d=state.drag;
   if(!d||d.pointer!==e.pointerId)return;
   if(d.kind==='resize'){
@@ -532,12 +557,13 @@ async function registerPwa(){
   }
 }
 function bind(){
-  $('prevPeriod').addEventListener('click',()=>periodShift(-1));
-  $('nextPeriod').addEventListener('click',()=>periodShift(1));
-  $('todayBtn').addEventListener('click',()=>{state.selected=dateString();state.timelineScroll=null;render();});
-  $('weekBtn').addEventListener('click',()=>switchView('week'));
-  $('newEventBtn').addEventListener('click',()=>openNew());
-  document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
+  $('periodMenuToggle').addEventListener('click',()=>setPeriodMenu($('periodMenu').classList.contains('hidden')));
+  document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{switchView(b.dataset.view);setPeriodMenu(false);}));
+  $('goTodayBtn').addEventListener('click',()=>{state.selected=dateString();state.timelineScroll=null;render();setPeriodMenu(false);});
+  $('refreshMenuBtn').addEventListener('click',()=>{setPeriodMenu(false);state.mode==='cloud'?cloudRefresh():initializeData();});
+  document.addEventListener('pointerdown',e=>{if(!e.target.closest('#periodPicker'))setPeriodMenu(false);});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')setPeriodMenu(false);});
+  $('agendaNewBtn').addEventListener('click',()=>openNew());
   $('calendarPanel').addEventListener('click',clickInsideCalendar);
   $('agendaList').addEventListener('click',clickInsideCalendar);
   $('recurrenceType').addEventListener('change',recurrenceVisible);
@@ -547,15 +573,14 @@ function bind(){
   document.querySelectorAll('[data-scope]').forEach(b=>b.addEventListener('click',()=>{setScope(b.dataset.scope);updateConflictNotice();}));
   document.querySelectorAll('[data-color]').forEach(b=>b.addEventListener('click',()=>setColor(b.dataset.color)));
   ['eventTitle','eventDate','eventTime','durationHours','durationMinutes','recurrenceType','recurrenceCount','recurrenceUntil'].forEach(id=>{['change','input'].forEach(type=>$(id).addEventListener(type,updateConflictNotice));});
-  $('refreshBtn').addEventListener('click',()=>state.mode==='cloud'?cloudRefresh():initializeData());
-
   $('eventDialog').addEventListener('click',e=>{if(e.target===$('eventDialog'))e.target.close();});
   document.addEventListener('pointerdown',onPointerDown,{passive:false});
   document.addEventListener('pointermove',onPointerMove,{passive:false});
   document.addEventListener('pointerup',onPointerUp,{passive:false});
-  document.addEventListener('pointercancel',()=>stopDrag(),{passive:true});
+  document.addEventListener('pointercancel',()=>{cancelDayHold();stopDrag();},{passive:true});
+  $('calendarPanel').addEventListener('contextmenu',e=>{if(e.target.closest('[data-day]'))e.preventDefault();});
   $('calendarPanel').addEventListener('touchstart',e=>{if(e.touches.length===1)state.swipe={x:e.touches[0].clientX,y:e.touches[0].clientY};},{passive:true});
-  $('calendarPanel').addEventListener('touchend',e=>{if(!state.swipe||state.drag?.active)return;const t=e.changedTouches[0];const dx=t.clientX-state.swipe.x,dy=t.clientY-state.swipe.y;state.swipe=null;if(Math.abs(dx)>80&&Math.abs(dy)<45)periodShift(dx<0?1:-1);},{passive:true});
+  $('calendarPanel').addEventListener('touchend',e=>{if(!state.swipe||state.drag?.active)return;const t=e.changedTouches[0];const dx=t.clientX-state.swipe.x,dy=t.clientY-state.swipe.y;state.swipe=null;if(Math.abs(dx)>80&&Math.abs(dy)<45){cancelDayHold();periodShift(dx<0?1:-1);}},{passive:true});
   window.addEventListener('focus',()=>cloudRefresh({silent:true}));
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')cloudRefresh({silent:true});});
   setInterval(()=>{if(document.visibilityState==='visible')cloudRefresh({silent:true});},20000);
@@ -580,14 +605,14 @@ async function initializeData(){
     }
   }catch(err){
     state.mode='error';state.events=[];
-    setBanner(`Impossibile collegarsi a Supabase: ${err.message}. Controlla URL, chiave pubblicabile e tabella orbis_events, poi premi Aggiorna.`,true);
+    setBanner(`Impossibile collegarsi a Supabase: ${err.message}. Controlla URL, chiave pubblicabile e tabella orbis_events, poi scegli Aggiorna dal menu del mese.`,true);
     render();
   }
 }
 async function initialize(){
   bind();registerPwa();
-  const storedView=readStore(VIEW_KEY);
-  state.view=['month','week','day'].includes(storedView)?storedView:'month';
+  // La prima schermata e' sempre il mese.
+  state.view='month';
   render();await initializeData();
 }
 initialize();
