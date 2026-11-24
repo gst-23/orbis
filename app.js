@@ -1,18 +1,15 @@
 import {CONFIG} from './config.js';
-import {dateString, localNowString, shiftDay, startOfWeek, dayFromISO, fromDayNumber, addMinutes, minuteNumber, expandEvents, eventsOnDay, conflictMatches, monthLength} from './recurrence.js';
+import {dateString, shiftDay, startOfWeek, dayFromISO, fromDayNumber, minuteNumber, expandEvents, eventsOnDay, conflictMatches, monthLength} from './recurrence.js';
 
 /* Orbis Lite — static PWA + Supabase Data API. Shared publicly, without accounts. */
 const $ = id => document.getElementById(id);
 const DEMO_STORE='orbis-lite-local-v1';
-const MONTHS=new Intl.DateTimeFormat('it-IT',{month:'long',year:'numeric',timeZone:'UTC'});
-const FULL_DATE=new Intl.DateTimeFormat('it-IT',{weekday:'long',day:'numeric',month:'long',timeZone:'UTC'});
 const WEEKDAYS=['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
-const daysOfWeek=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
 const colors=['one','two','three'];
 const state={
-  selected:dateString(), view:'month', events:[], mode:'demo', client:null, version:0,
+  selected:dateString(), events:[], mode:'demo', client:null, version:0,
   occurrenceMap:new Map(), edit:null, toastTimer:null, syncBusy:false,
-  drag:null, hover:null, swipe:null, timelineScroll:null, dayHold:null, preventDayClick:null,
+  drag:null, hover:null, swipe:null, dayHold:null, preventDayClick:null, animatingMonth:false, animateAgendaNext:false, recentlySavedId:null,
 };
 function readStore(key){try{return localStorage.getItem(key);}catch{return null;}}
 function writeStore(key,value){try{localStorage.setItem(key,value);}catch{}}
@@ -113,42 +110,32 @@ async function removeOne(event){
   if(state.mode==='demo')demoSave(state.events);
   render();
 }
-function periodShift(dir){
-  const d=state.selected;
-  if(state.view==='day')state.selected=shiftDay(d,dir);
-  if(state.view==='week')state.selected=shiftDay(d,dir*7);
-  if(state.view==='month'){
-    const [y,m,day]=d.split('-').map(Number);
-    const first=new Date(Date.UTC(y,m-1+dir,1));
-    const yr=first.getUTCFullYear(),mo=first.getUTCMonth()+1;
-    state.selected=`${yr}-${pad(mo)}-${pad(Math.min(day,monthLength(yr,mo)))}`;
-  }
+function changeMonth(dir){
+  const [y,m,day]=state.selected.split('-').map(Number);
+  const first=new Date(Date.UTC(y,m-1+dir,1));
+  const yr=first.getUTCFullYear(), mo=first.getUTCMonth()+1;
+  state.selected=`${yr}-${pad(mo)}-${pad(Math.min(day,monthLength(yr,mo)))}`;
+  state.animateAgendaNext=true;
   render();
 }
-function switchView(view){
-  if(!['month','week','day'].includes(view))return;
-  state.view=view;render();
+function reducedMotion(){return window.matchMedia('(prefers-reduced-motion: reduce)').matches;}
+function shiftMonthAnimated(dir){
+  if(state.animatingMonth)return;
+  const panel=$('calendarPanel');
+  if(reducedMotion() || !panel.animate){changeMonth(dir);return;}
+  state.animatingMonth=true;
+  const distance=Math.min(55,window.innerWidth*.15);
+  const options={duration:145,easing:'cubic-bezier(.4,0,1,1)',fill:'forwards'};
+  const outgoing=panel.animate([{opacity:1,transform:'translateX(0)'},{opacity:0,transform:`translateX(${-dir*distance}px)`}],options);
+  outgoing.finished.then(()=>{
+    outgoing.cancel();
+    changeMonth(dir);
+    const incoming=panel.animate([{opacity:0,transform:`translateX(${dir*distance}px)`},{opacity:1,transform:'translateX(0)'}],{duration:265,easing:'cubic-bezier(.2,.75,.2,1)'});
+    incoming.finished.catch(()=>{}).finally(()=>{state.animatingMonth=false;});
+  }).catch(()=>{state.animatingMonth=false;changeMonth(dir);});
 }
 function headerRender(){
-  const sel=state.selected;
-  if(state.view==='month'){
-    $('periodTitle').textContent=capital(humanDate(sel,{month:'long',year:'numeric'}));
-  }else if(state.view==='week'){
-    const from=startOfWeek(sel),to=shiftDay(from,6);
-    $('periodTitle').textContent=`${humanDate(from,{day:'numeric',month:'short'})} – ${humanDate(to,{day:'numeric',month:'short'})}`;
-  }else{
-    $('periodTitle').textContent=capital(humanDate(sel,{weekday:'long',day:'numeric',month:'long'}));
-  }
-  document.querySelectorAll('[data-view]').forEach(b=>{
-    const active=b.dataset.view===state.view;
-    b.classList.toggle('active',active);
-    b.setAttribute('aria-pressed',String(active));
-  });
-}
-function setPeriodMenu(open){
-  const menu=$('periodMenu');
-  menu.classList.toggle('hidden',!open);
-  $('periodMenuToggle').setAttribute('aria-expanded',String(open));
+  $('periodTitle').textContent=capital(humanDate(state.selected,{month:'long',year:'numeric'}));
 }
 function getMonthSpan(){
   const first=state.selected.slice(0,7)+'-01';
@@ -174,59 +161,28 @@ function monthRender(){
   }
   $('calendarPanel').innerHTML=`<div class="weekday-head">${WEEKDAYS.map(d=>`<span>${d}</span>`).join('')}</div><div class="month-grid">${cells}</div>`;
 }
-function weekRender(){
-  const from=startOfWeek(state.selected),to=shiftDay(from,7);
-  const occ=expandEvents(state.events,from,to);
-  let cols='';
-  for(let i=0;i<7;i++){
-    const date=shiftDay(from,i),items=occ.filter(o=>o.start_at.slice(0,10)<=date&&o.end_at.slice(0,10)>=date&&minuteNumber(o.end_at)>minuteNumber(`${date}T00:00`));
-    cols+=`<button class="week-date ${date===state.selected?'selected':''} ${date===dateString()?'today':''}" data-day="${date}" aria-label="${WEEKDAYS[i]} ${Number(date.slice(-2))}, ${items.length} appuntamenti"><span class="day-label">${WEEKDAYS[i]}</span><span class="day-number">${Number(date.slice(-2))}</span>${dotMarkup(items)}</button>`;
-  }
-  $('calendarPanel').innerHTML=`<div class="week-grid">${cols}</div>`;
-}
-function dayRender(){
-  const day=state.selected,occ=eventsOnDay(state.events,day),weekIndex=new Date(`${day}T12:00:00Z`).getUTCDay();
-  const slots=Array.from({length:24},(_,h)=>`<div class="hour-slot" style="top:${h*48}px" data-hour="${h}"><span>${pad(h)}:00</span></div>`).join('');
-  const dayNumber=minuteNumber(`${day}T00:00`);
-  const entries=occ.map(o=>{
-    state.occurrenceMap.set(o.uid,o);
-    const start=minuteNumber(o.start_at)-dayNumber;
-    const clipTop=clamp(start,0,1440);
-    const totalVisible=clamp(o.duration_min+Math.min(start,0),0,1440-clipTop);
-    const top=clipTop*48/60;
-    const height=Math.max(25,totalVisible*48/60);
-    const clashes=occ.some(q=>q.uid!==o.uid&&minuteNumber(q.start_at)<minuteNumber(o.end_at)&&minuteNumber(q.end_at)>minuteNumber(o.start_at));
-    const creator=colors.includes(o.creator)?o.creator:'one';
-    return `<div class="timeline-event color-${creator} ${clashes?'clashed':''}" data-draggable="${esc(o.uid)}" style="top:${top.toFixed(2)}px;height:${height.toFixed(2)}px"><div class="timeline-title" data-edit="${esc(o.uid)}">${esc(o.title)} ${o.recurrence_unit?'↻':''}</div><div class="timeline-time" data-edit="${esc(o.uid)}">${prettyTime(o.start_at)} – ${prettyTime(o.end_at)}</div><span class="resize-handle" data-resize="${esc(o.uid)}" role="button" tabindex="0" aria-label="Modifica la durata trascinando">⌄</span></div>`;
-  }).join('');
-  $('calendarPanel').innerHTML=`<div class="day-timeline-scroll" id="timelineScroller"><div class="day-timeline">${slots}${entries}</div></div>`;
-  const timeline=$('timelineScroller');
-  const pref=day===dateString()?clamp(Number(localNowString().slice(11,13))-2,6,18):7;
-  timeline.scrollTop=state.timelineScroll??pref*48;
-  state.timelineScroll=null;
-}
 function renderAgenda(){
   const sel=state.selected;
   const occ=eventsOnDay(state.events,sel);
-  if(state.view==='day'){$('agendaSection').classList.add('hidden');return;}
-  $('agendaSection').classList.remove('hidden');
   $('agendaTitle').textContent=sel===dateString()?'Oggi':capital(humanDate(sel,{weekday:'long',day:'numeric',month:'long'}));
   state.occurrenceMap=new Map(occ.map(o=>[o.uid,o]));
+  const shouldAnimate=state.animateAgendaNext;
+  $('agendaList').classList.toggle('animated',shouldAnimate);
   if(!occ.length){
     $('agendaList').innerHTML='<div class="empty-state">Nessun appuntamento</div>';
+    state.animateAgendaNext=false;
     return;
   }
-  $('agendaList').innerHTML=occ.map(o=>{
+  $('agendaList').innerHTML=occ.map((o,index)=>{
     const creator=colors.includes(o.creator)?o.creator:'one';
-    return `<article class="agenda-card color-${creator}" data-draggable="${esc(o.uid)}"><span class="start-time">${prettyTime(o.start_at)}</span><button type="button" class="agenda-main" data-edit="${esc(o.uid)}"><span class="agenda-name">${esc(o.title)}</span><span class="agenda-extra">${durationLabel(o.duration_min)}${o.recurrence_unit?' · ↻ Ricorrente':''}${o.revised?' · Modificato':''}</span></button><span class="agenda-mark" aria-hidden="true"></span></article>`;
+    return `<article class="agenda-card color-${creator} ${o.id===state.recentlySavedId?'just-saved':''}" style="--row-order:${Math.min(index,9)}" data-draggable="${esc(o.uid)}"><span class="start-time">${prettyTime(o.start_at)}</span><button type="button" class="agenda-main" data-edit="${esc(o.uid)}"><span class="agenda-name">${esc(o.title)}</span><span class="agenda-extra">${durationLabel(o.duration_min)}${o.recurrence_unit?' · ↻ Ricorrente':''}${o.revised?' · Modificato':''}</span></button><span class="agenda-mark" aria-hidden="true"></span></article>`;
   }).join('');
+  state.animateAgendaNext=false;
 }
 function render(){
   state.occurrenceMap=new Map();
   headerRender();
-  if(state.view==='month')monthRender();
-  else if(state.view==='week')weekRender();
-  else dayRender();
+  monthRender();
   renderAgenda();
 }
 function setColor(c){
@@ -346,13 +302,15 @@ async function saveEditor(e){
   }
   button.disabled=true;
   try{
+    state.recentlySavedId=next.id;
     await saveOne(next,edit.isNew);
     $('eventDialog').close();state.edit=null;
-    state.selected=payload.start_at.slice(0,10);state.timelineScroll=null;
+    state.selected=payload.start_at.slice(0,10);state.animateAgendaNext=true;
     render();
+    window.setTimeout(()=>{state.recentlySavedId=null;},700);
     const clashes=conflictMatches(payload,state.events,edit.scope==='occurrence'?`${next.id}|${edit.original}`:'',edit.scope==='series'?next.id:'');
     toast(clashes.length?'Salvato. Attenzione: c’è una sovrapposizione.':edit.isNew?'Appuntamento aggiunto.':'Appuntamento aggiornato.');
-  }catch(err){$('formError').textContent=err.message||'Salvataggio non riuscito.';$('formError').classList.remove('hidden');}
+  }catch(err){state.recentlySavedId=null;$('formError').textContent=err.message||'Salvataggio non riuscito.';$('formError').classList.remove('hidden');}
   finally{button.disabled=false;}
 }
 async function deleteEditor(){
@@ -378,24 +336,18 @@ async function saveOccurrenceChange(occ,changes,successText){
     toast(clashes.length?`${successText} Attenzione: orari sovrapposti.`:successText);
   }catch(err){toast(err.message||'Non è stato possibile salvare.');}
 }
-async function nudgeDuration(uid,delta){
-  const occ=state.occurrenceMap.get(uid);if(!occ)return;
-  const newMinutes=clamp(occ.duration_min+delta,1,1439);
-  if(newMinutes===occ.duration_min)return;
-  await saveOccurrenceChange(occ,{duration_min:newMinutes},`Durata: ${durationLabel(newMinutes)}`);
-}
 function clickInsideCalendar(e){
-  const dur=e.target.closest('[data-duration]');
-  if(dur){nudgeDuration(dur.dataset.uid,Number(dur.dataset.duration));return;}
   const edit=e.target.closest('[data-edit]');
   if(edit){const occ=state.occurrenceMap.get(edit.dataset.edit);if(occ)openEdit(occ);return;}
-  const add=e.target.closest('[data-add-day]');
-  if(add){openNew(add.dataset.addDay);return;}
   const day=e.target.closest('[data-day]');
-  if(day){if(state.preventDayClick===day.dataset.day){state.preventDayClick=null;return;}state.selected=day.dataset.day;state.timelineScroll=null;render();return;}
-  if(state.view==='day'){
-    const slot=e.target.closest('[data-hour]');
-    if(slot)openNew(state.selected,`${pad(Number(slot.dataset.hour))}:00`);
+  if(day){
+    if(state.preventDayClick===day.dataset.day){state.preventDayClick=null;return;}
+    if(state.skipClickUntil && Date.now()<state.skipClickUntil)return;
+    if(state.selected!==day.dataset.day){
+      state.selected=day.dataset.day;
+      state.animateAgendaNext=true;
+      render();
+    }
   }
 }
 function dragEligible(el){
@@ -417,17 +369,8 @@ function beginDrag(){
 function autoScrollWhileDragging(){
   const d=state.drag;
   if(!d||!d.active||d.kind!=='move')return;
-  if(state.view==='day'){
-    const scroller=$('timelineScroller');
-    if(scroller){
-      const r=scroller.getBoundingClientRect();
-      if(d.lastY<r.top+46&&d.lastY>r.top-25)scroller.scrollTop-=12;
-      else if(d.lastY>r.bottom-46&&d.lastY<r.bottom+25)scroller.scrollTop+=12;
-    }
-  }else{
-    if(d.lastY<135)window.scrollBy(0,-12);
-    else if(d.lastY>window.innerHeight-125)window.scrollBy(0,12);
-  }
+  if(d.lastY<135)window.scrollBy(0,-12);
+  else if(d.lastY>window.innerHeight-125)window.scrollBy(0,12);
   showDropTarget(findDrop(d.lastX,d.lastY));
   d.frame=requestAnimationFrame(autoScrollWhileDragging);
 }
@@ -435,17 +378,7 @@ function ghostPosition(x,y){
   const ghost=$('dragGhost');ghost.style.left=`${x}px`;ghost.style.top=`${y}px`;
 }
 function findDrop(x,y){
-  if(state.view==='day'){
-    const timeline=document.querySelector('.day-timeline');
-    if(!timeline)return null;
-    const rect=timeline.getBoundingClientRect();
-    if(x<rect.left||x>rect.right||y<rect.top-18||y>rect.bottom+18)return null;
-    const offset=clamp(y-rect.top,0,1151);
-    const minute=clamp(Math.round(offset/48*4)*15,0,1425);
-    return {day:state.selected,minute,element:document.querySelector(`.hour-slot[data-hour="${Math.floor(minute/60)}"]`)};
-  }
-  const candidates=document.elementsFromPoint(x,y);
-  const el=candidates.map(e=>e.closest?.('[data-day]')).find(Boolean);
+  const el=document.elementsFromPoint(x,y).map(e=>e.closest?.('[data-day]')).find(Boolean);
   return el?{day:el.dataset.day,element:el}:null;
 }
 function showDropTarget(target){
@@ -486,23 +419,13 @@ function onPointerDown(e){
     },600);
     state.dayHold=hold;
   }
-  const resize=e.target.closest('[data-resize]');
-  if(resize){
-    const occ=state.occurrenceMap.get(resize.dataset.resize);
-    if(!occ)return;
-    const source=resize.closest('.timeline-event');
-    state.drag={kind:'resize',pointer:e.pointerId,occ,from:source,active:true,lastX:e.clientX,lastY:e.clientY,startY:e.clientY,startDuration:occ.duration_min,newDuration:occ.duration_min};
-    resize.setPointerCapture?.(e.pointerId);
-    e.preventDefault();return;
-  }
   const from=dragEligible(e.target);
   if(!from)return;
   const occ=state.occurrenceMap.get(from.dataset.draggable);
   if(!occ)return;
   const drag={kind:'move',pointer:e.pointerId,occ,from,active:false,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,timer:null};
   state.drag=drag;
-  if(state.view==='day')beginDrag();
-  else drag.timer=setTimeout(()=>{if(state.drag===drag)beginDrag();},300);
+  drag.timer=setTimeout(()=>{if(state.drag===drag)beginDrag();},340);
 }
 function onPointerMove(e){
   const hold=state.dayHold;
@@ -510,17 +433,6 @@ function onPointerMove(e){
   const d=state.drag;
   if(!d||d.pointer!==e.pointerId)return;
   d.lastX=e.clientX;d.lastY=e.clientY;
-  if(d.kind==='resize'){
-    const delta=Math.round((e.clientY-d.startY)/48*4)*15;
-    const duration=clamp(d.startDuration+delta,1,1439);
-    d.newDuration=duration;
-    const startMinute=minuteNumber(d.occ.start_at)-minuteNumber(`${state.selected}T00:00`);
-    const visible=Math.min(duration,1440-Math.max(0,startMinute));
-    d.from.style.height=`${Math.max(25,visible*48/60)}px`;
-    const label=d.from.querySelector('.timeline-time');
-    if(label)label.textContent=`${prettyTime(d.occ.start_at)} – ${prettyTime(addMinutes(d.occ.start_at,duration))}`;
-    e.preventDefault();return;
-  }
   if(!d.active){
     if(Math.hypot(e.clientX-d.startX,e.clientY-d.startY)>12){clearTimeout(d.timer);state.drag=null;}
     return;
@@ -533,22 +445,14 @@ async function onPointerUp(e){
   if(state.dayHold?.id===e.pointerId)cancelDayHold();
   const d=state.drag;
   if(!d||d.pointer!==e.pointerId)return;
-  if(d.kind==='resize'){
-    const changed=d.newDuration!==d.startDuration;
-    stopDrag();
-    if(changed)await saveOccurrenceChange(d.occ,{duration_min:d.newDuration},`Nuova durata: ${durationLabel(d.newDuration)}`);
-    else render();
-    return;
-  }
   const active=d.active,hover=state.hover;
   stopDrag();
   if(!active||!hover)return;
   const hhmm=prettyTime(d.occ.start_at);
   const start=hover.minute!=null?`${hover.day}T${pad(Math.floor(hover.minute/60))}:${pad(hover.minute%60)}`:`${hover.day}T${hhmm}`;
   if(start===d.occ.start_at)return;
-  state.timelineScroll=$('timelineScroller')?.scrollTop??null;
   await saveOccurrenceChange(d.occ,{start_at:start},'Appuntamento spostato.');
-  if(state.view!=='day')state.selected=hover.day;
+  state.selected=hover.day;state.animateAgendaNext=true;
   render();
 }
 async function registerPwa(){
@@ -557,12 +461,9 @@ async function registerPwa(){
   }
 }
 function bind(){
-  $('periodMenuToggle').addEventListener('click',()=>setPeriodMenu($('periodMenu').classList.contains('hidden')));
-  document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{switchView(b.dataset.view);setPeriodMenu(false);}));
-  $('goTodayBtn').addEventListener('click',()=>{state.selected=dateString();state.timelineScroll=null;render();setPeriodMenu(false);});
-  $('refreshMenuBtn').addEventListener('click',()=>{setPeriodMenu(false);state.mode==='cloud'?cloudRefresh():initializeData();});
-  document.addEventListener('pointerdown',e=>{if(!e.target.closest('#periodPicker'))setPeriodMenu(false);});
-  document.addEventListener('keydown',e=>{if(e.key==='Escape')setPeriodMenu(false);});
+  $('goTodayBtn').addEventListener('click',()=>{
+    state.selected=dateString();state.animateAgendaNext=true;render();
+  });
   $('agendaNewBtn').addEventListener('click',()=>openNew());
   $('calendarPanel').addEventListener('click',clickInsideCalendar);
   $('agendaList').addEventListener('click',clickInsideCalendar);
@@ -580,7 +481,21 @@ function bind(){
   document.addEventListener('pointercancel',()=>{cancelDayHold();stopDrag();},{passive:true});
   $('calendarPanel').addEventListener('contextmenu',e=>{if(e.target.closest('[data-day]'))e.preventDefault();});
   $('calendarPanel').addEventListener('touchstart',e=>{if(e.touches.length===1)state.swipe={x:e.touches[0].clientX,y:e.touches[0].clientY};},{passive:true});
-  $('calendarPanel').addEventListener('touchend',e=>{if(!state.swipe||state.drag?.active)return;const t=e.changedTouches[0];const dx=t.clientX-state.swipe.x,dy=t.clientY-state.swipe.y;state.swipe=null;if(Math.abs(dx)>80&&Math.abs(dy)<45){cancelDayHold();periodShift(dx<0?1:-1);}},{passive:true});
+  $('calendarPanel').addEventListener('touchend',e=>{
+    if(!state.swipe||state.drag?.active)return;
+    const t=e.changedTouches[0],dx=t.clientX-state.swipe.x,dy=t.clientY-state.swipe.y;
+    state.swipe=null;
+    if(Math.abs(dx)>70&&Math.abs(dy)<50){
+      cancelDayHold();state.skipClickUntil=Date.now()+350;
+      shiftMonthAnimated(dx<0?1:-1);
+    }
+  },{passive:true});
+  $('calendarPanel').addEventListener('touchcancel',()=>{state.swipe=null;cancelDayHold();},{passive:true});
+  $('calendarPanel').addEventListener('keydown',e=>{
+    if(e.key==='ArrowLeft'||e.key==='ArrowRight'){
+      e.preventDefault();shiftMonthAnimated(e.key==='ArrowRight'?1:-1);
+    }
+  });
   window.addEventListener('focus',()=>cloudRefresh({silent:true}));
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')cloudRefresh({silent:true});});
   setInterval(()=>{if(document.visibilityState==='visible')cloudRefresh({silent:true});},20000);
@@ -605,14 +520,13 @@ async function initializeData(){
     }
   }catch(err){
     state.mode='error';state.events=[];
-    setBanner(`Impossibile collegarsi a Supabase: ${err.message}. Controlla URL, chiave pubblicabile e tabella orbis_events, poi scegli Aggiorna dal menu del mese.`,true);
+    setBanner(`Impossibile collegarsi a Supabase: ${err.message}. Controlla URL, chiave pubblicabile e tabella orbis_events, poi ricarica la pagina.`,true);
     render();
   }
 }
 async function initialize(){
   bind();registerPwa();
-  // La prima schermata e' sempre il mese.
-  state.view='month';
+  // Unica vista: mese.
   render();await initializeData();
 }
 initialize();

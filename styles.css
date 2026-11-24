@@ -93,3 +93,83 @@ html,body{background:#080809;color:#f5f5f5}
 @media (max-width:360px){.app{padding-left:15px;padding-right:15px}.period-trigger h1{font-size:27px}.calendar-panel{padding:0 0 21px}.day-cell{height:50px;min-height:50px;padding:3px 0}.day-number{font-size:14px;width:31px;height:30px;line-height:30px}.agenda-header h2{font-size:17px}}
 @media (min-width:521px){.app{border:0}.period-section{padding-top:40px}}
 @media(prefers-reduced-motion:reduce){.period-trigger svg,.agenda-card{transition:none}}
+
+
+/* Orbis v3 — solo mese, maggiore spazio utile, microinterazioni in stile Filo */
+.period-section{
+  padding:calc(10px + env(safe-area-inset-top)) 0 9px;
+}
+.period-trigger{
+  min-height:39px;
+  padding:0;
+  border:0;
+  border-radius:9px;
+  touch-action:manipulation;
+  transition:opacity .16s ease,transform .22s cubic-bezier(.2,.8,.2,1);
+}
+.period-trigger:active{opacity:.63;transform:scale(.985)}
+.period-trigger h1{font-size:clamp(25px,7vw,32px);line-height:1.08;letter-spacing:-1.35px}
+.calendar-panel{padding:0 0 14px;will-change:transform,opacity}
+.weekday-head{margin:0 0 3px}
+.weekday-head span{padding:5px 0 8px}
+.day-cell{transition:background .18s ease,border-color .2s ease,color .2s ease,transform .17s ease}
+.day-cell:active{transform:scale(.92)}
+.day-cell.selected{animation:orbis-day-select .28s cubic-bezier(.25,.8,.25,1) both}
+.event-dot{transition:transform .22s ease,opacity .22s ease}
+.day-cell.selected .event-dot{transform:scale(1.14)}
+.agenda-section{padding-top:16px}
+.agenda-header{margin-bottom:9px}
+.agenda-add{
+  width:36px;height:36px;
+  transition:background .2s ease,transform .24s cubic-bezier(.15,.85,.35,1),box-shadow .2s ease;
+}
+.agenda-add:active{transform:scale(.86) rotate(90deg);background:#323828;box-shadow:0 0 0 4px #dfff2014}
+.agenda-card{transition:background .2s ease,transform .2s ease,opacity .18s ease}
+.agenda-card:active{background:#151517;transform:scale(.987)}
+.agenda-list.animated .agenda-card{animation:orbis-row-in .31s cubic-bezier(.16,.8,.2,1) both;animation-delay:calc(var(--row-order) * 38ms)}
+.agenda-list.animated .empty-state{animation:orbis-empty-in .24s ease-out both}
+.agenda-card.just-saved{animation:orbis-saved .46s cubic-bezier(.15,.8,.2,1) both}
+.agenda-list.animated .agenda-card.just-saved{animation:orbis-saved .46s cubic-bezier(.15,.8,.2,1) both}
+.bottom-sheet[open]{animation:orbis-sheet-in .35s cubic-bezier(.2,.85,.2,1) both}
+.bottom-sheet[open]::backdrop{animation:orbis-backdrop-in .25s ease-out both}
+.primary-button{transition:transform .17s ease,filter .17s ease}
+.primary-button:active{transform:scale(.98);filter:brightness(1.08)}
+.sheet-close{transition:transform .2s ease}
+.sheet-close:active{transform:scale(.88)}
+.toast:not(.hidden){animation:orbis-toast-in .3s cubic-bezier(.1,.85,.2,1) both}
+.drag-ghost:not(.hidden){animation:orbis-ghost-in .13s ease-out both}
+@keyframes orbis-day-select{
+  0%{transform:scale(.9);opacity:.76}
+  65%{transform:scale(1.035);opacity:1}
+  100%{transform:scale(1);opacity:1}
+}
+@keyframes orbis-row-in{
+  from{opacity:0;transform:translateY(9px)}
+  to{opacity:1;transform:translateY(0)}
+}
+@keyframes orbis-empty-in{
+  from{opacity:0;transform:translateY(5px)}
+  to{opacity:1;transform:translateY(0)}
+}
+@keyframes orbis-saved{
+  0%{opacity:.35;transform:translateY(12px) scale(.98)}
+  65%{opacity:1;transform:translateY(-2px) scale(1.01)}
+  100%{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes orbis-sheet-in{
+  from{opacity:.2;transform:translateY(58px)}
+  to{opacity:1;transform:translateY(0)}
+}
+@keyframes orbis-backdrop-in{from{background:rgba(0,0,0,0)}to{background:rgba(0,0,0,.78)}}
+@keyframes orbis-toast-in{
+  from{opacity:0;transform:translate(-50%,11px) scale(.96)}
+  to{opacity:1;transform:translate(-50%,0) scale(1)}
+}
+@keyframes orbis-ghost-in{from{opacity:0}to{opacity:1}}
+@media(max-width:360px){
+  .period-section{padding-top:calc(7px + env(safe-area-inset-top));padding-bottom:8px}
+  .calendar-panel{padding-bottom:12px}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}

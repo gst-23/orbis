@@ -10,35 +10,26 @@
   <meta name="description" content="Orbis: calendario condiviso mobile, essenziale e senza login.">
   <title>Orbis · Calendario</title>
   <meta name="apple-mobile-web-app-title" content="Orbis">
-  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="manifest" href="./manifest.webmanifest?v=5">
   <link rel="icon" type="image/svg+xml" href="./icon.svg">
-  <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon-v2.png">
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32-v3.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="./icons/apple-touch-icon-167.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="./icons/apple-touch-icon-152.png">
+  <link rel="stylesheet" href="./styles.css?v=5">
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script type="module" src="./app.js"></script>
+  <script type="module" src="./app.js?v=5"></script>
 </head>
 <body>
 <div class="app" id="appRoot">
   <main>
-    <section class="period-section" aria-label="Periodo del calendario">
-      <div class="period-picker" id="periodPicker">
-        <button type="button" id="periodMenuToggle" class="period-trigger" aria-label="Scegli la vista del calendario" aria-haspopup="true" aria-expanded="false" aria-controls="periodMenu">
-          <h1 id="periodTitle">Novembre 2026</h1>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-        </button>
-        <div class="period-popover hidden" id="periodMenu" role="group" aria-label="Vista e navigazione">
-          <button type="button" data-view="month" class="active">Mese</button>
-          <button type="button" data-view="week">Settimana</button>
-          <button type="button" data-view="day">Giorno</button>
-          <div class="period-popover-divider"></div>
-          <button type="button" id="goTodayBtn">Torna a oggi</button>
-          <button type="button" id="refreshMenuBtn">Aggiorna calendario</button>
-        </div>
-      </div>
+    <section class="period-section" aria-label="Mese del calendario">
+      <button type="button" class="period-trigger" id="goTodayBtn" title="Torna al mese corrente" aria-label="Torna a oggi">
+        <h1 id="periodTitle">Novembre 2026</h1>
+      </button>
     </section>
 
-    <section id="calendarPanel" class="calendar-panel" aria-label="Calendario, scorri a destra o a sinistra per cambiare periodo"></section>
+    <section id="calendarPanel" class="calendar-panel" aria-label="Calendario mensile. Scorri a destra o sinistra per cambiare mese"></section>
 
     <section class="agenda-section" id="agendaSection">
       <div class="agenda-header">
